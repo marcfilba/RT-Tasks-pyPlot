@@ -13,9 +13,9 @@ ser = serial.Serial(serialPort, baudRate)
 plt.gcf().set_size_inches(15, 7, forward=True)
 plt.ion() # set plot to animated
 
-task1  = [0] * 1000
-task2  = [0] * 1000
-task3  = [0] * 1000
+task1  = [0] * 100
+task2  = [0] * 100
+task3  = [0] * 100
 
 ax1 = plt.axes()
 
