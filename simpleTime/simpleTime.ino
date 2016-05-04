@@ -45,19 +45,23 @@ int realRPM, desiredRPM, correctedRPM = 0;
 int error, integralError = 0;
 int Kp, Ki = 1;
 
-byte myMAC [] = { 0x90, 0xA2, 0xDA, 0x0F, 0x49, 0x41 };
-IPAddress myIP (172, 16, 10, 50);
+int sum = 0;
+int numSum = 0;
+
+byte myMAC [] = { 0x90, 0xA2, 0xDA, 0x0F, 0x49, 0x21 };
+IPAddress myIP (172, 16, 10, 239);
 IPAddress RIP (172, 16, 10, 255);
+//IPAddress RIP (172, 16, 10, 209);
 
 unsigned int localPort = 8889; // local port to listen on
-char packetBuffer [UDP_TX_PACKET_MAX_SIZE]; //buffer to hold incoming packet,
+int packetBuffer;
 EthernetUDP Udp; // EthernetUDP instance to let us receive packets over UDP
 
 void thread1() {
   data[0] = 1;
   data[1] = 0;
   data[2] = 0;
-  printData ();
+  //printData ();
   
   // velocity=readEencoder();
   realRPM = 1 / ((pulseIn (MOTOR_ENC_B, HIGH) * 3 / 1000000.0 ));
@@ -80,42 +84,60 @@ void thread1() {
   data[0] = 0;
   data[1] = 0;
   data[2] = 0;
-  printData ();
+  //printData ();
 }
 
 void thread2() {
   data[0] = 0;
   data[1] = 1;
   data[2] = 0;
-  printData ();
+  //printData ();
   
   float AcX = (float (accelgyro.getAccelerationX()) / equivAccel);
-  desiredRPM = min(MOTOR_MAX_RPM, AcX*MOTOR_MAX_RPM);
-  
-  //Udp.beginPacket (RIP, 8889);
-  //Udp.write (String(desiredRPM + "\n").c_str());
-  //Udp.endPacket();
+  Udp.beginPacket (RIP, 8889);
+  //Udp.write (String(abs(AcX*MOTOR_MAX_RPM) + "\n").c_str());
+  Udp.write ((int) min((AcX*220), 220));
+  Udp.endPacket();
   
   data[0] = 0;
   data[1] = 0;
   data[2] = 0;
-  printData ();
+ //printData ();
 }
 
 void thread3() {
   data[0] = 0;
   data[1] = 0;
   data[2] = 1;
-  printData ();
+  //printData ();
   if (Udp.parsePacket()){
-    Udp.read (packetBuffer, UDP_TX_PACKET_MAX_SIZE);
-    int udpRPM = String(packetBuffer).toInt();     //  CAL FER LA MITJA
+    Udp.read ( (char*) &packetBuffer, UDP_TX_PACKET_MAX_SIZE);
+    numSum++;
+    sum += packetBuffer;
+    
+    Serial.print("From ");
+    IPAddress remote = Udp.remoteIP();
+    for (int i = 0; i < 4; i++) {
+      Serial.print(remote[i], DEC);
+      if (i < 3) {
+        Serial.print(".");
+      }
+    }
+    Serial.print (" ");
+    Serial.println (packetBuffer);
+    
+    if (numSum == 5){
+      desiredRPM = min(MOTOR_MAX_RPM, sum/5);
+      Serial.println ("Mitja: " + String(sum/5));
+      numSum = 0;
+      sum = 0;
+    }
   }
   for (int i = 0; i < 1000; ++i);
   data[0] = 0;
   data[1] = 0;
   data[2] = 0;
-  printData ();
+  //printData ();
 }
 
 void setRPM (int rpm){
@@ -154,12 +176,15 @@ void setup() {
     for (int i = 0; i < 3; ++i) data[i] = 0;
     
     Ethernet.begin (myMAC, myIP);
+    Udp.begin (localPort);
+    
     
     Serial.begin(115200);
+    Serial.println ("dale");
     
     accelgyro.initialize();
     
-    setRPM (120);
+    setRPM (220);
     startMotor();
 
 }
@@ -167,6 +192,3 @@ void setup() {
 void loop() {
     timer.run();
 }
-
-
-
